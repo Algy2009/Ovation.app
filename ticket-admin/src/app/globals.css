@@ -1,0 +1,42 @@
+@import "tailwindcss";
+@import "@fontsource/archivo-black";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+:root {
+  --bg: #0b0b0e;
+}
+
+@theme inline {
+  --color-ink: #0b0b0e;
+  --color-panel: #141419;
+  --color-panel-raised: #1b1b22;
+  --color-line: #2a2a33;
+  --color-silver: #c9cdd3;
+  --color-silver-dim: #74777f;
+  --color-paper: #f3f2ee;
+  --color-gold: #e4a92c;
+  --color-gold-dim: #6b551c;
+  --color-red: #e0523f;
+  --font-display: "Archivo Black", "Arial Black", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+
+/* thin scrollbar to match the console aesthetic */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}

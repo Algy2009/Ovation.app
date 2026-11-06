@@ -18,6 +18,11 @@
 **/data/*.db-wal
 **/data/*.db-shm
 
+# expo
+.expo/
+dist/
+web-build/
+
 # misc
 .DS_Store
 *.pem

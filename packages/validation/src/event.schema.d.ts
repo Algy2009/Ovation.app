@@ -1,0 +1,43 @@
+import { z } from "zod";
+export declare const ticketCategoryInputSchema: z.ZodObject<{
+    id: z.ZodOptional<z.ZodString>;
+    name: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    price: z.ZodNumber;
+    totalQuota: z.ZodNumber;
+    maxPerTransaction: z.ZodDefault<z.ZodNumber>;
+    isVirtualQueueEnabled: z.ZodDefault<z.ZodBoolean>;
+    isStanding: z.ZodDefault<z.ZodBoolean>;
+    salesStartTime: z.ZodString;
+    salesEndTime: z.ZodString;
+}, z.core.$strip>;
+export declare const createEventSchema: z.ZodObject<{
+    categoryId: z.ZodString;
+    title: z.ZodString;
+    description: z.ZodString;
+    termsAndConditions: z.ZodOptional<z.ZodString>;
+    bannerUrl: z.ZodUnion<[z.ZodString, z.ZodString]>;
+    venueName: z.ZodString;
+    venueCity: z.ZodString;
+    address: z.ZodString;
+    startDatetime: z.ZodString;
+    endDatetime: z.ZodString;
+    warTicketActive: z.ZodDefault<z.ZodBoolean>;
+    warTicketStartTime: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    maxTicketsPerNik: z.ZodDefault<z.ZodNumber>;
+    maxTicketsPerTransaction: z.ZodDefault<z.ZodNumber>;
+    ticketCategories: z.ZodArray<z.ZodObject<{
+        id: z.ZodOptional<z.ZodString>;
+        name: z.ZodString;
+        description: z.ZodOptional<z.ZodString>;
+        price: z.ZodNumber;
+        totalQuota: z.ZodNumber;
+        maxPerTransaction: z.ZodDefault<z.ZodNumber>;
+        isVirtualQueueEnabled: z.ZodDefault<z.ZodBoolean>;
+        isStanding: z.ZodDefault<z.ZodBoolean>;
+        salesStartTime: z.ZodString;
+        salesEndTime: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type TicketCategoryInput = z.infer<typeof ticketCategoryInputSchema>;

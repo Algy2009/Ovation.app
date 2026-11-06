@@ -1,0 +1,39 @@
+{
+  "name": "ovation-app-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Concert Ticket Booking Platform (Midtrans, Xendit, Virtual Queue, Anti-Overselling)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:generate": "npm run generate --workspace=@ovation/database",
+    "db:push": "npm run push --workspace=@ovation/database",
+    "db:seed": "npm run seed --workspace=@ovation/database",
+    "db:studio": "npm run studio --workspace=@ovation/database",
+    "dev:web": "npm run dev --workspace=@ovation/web",
+    "build:web": "npm run build --workspace=@ovation/web",
+    "test": "tsx scripts/test-suite.ts"
+  },
+  "keywords": [
+    "concert-tickets",
+    "nextjs",
+    "prisma",
+    "midtrans",
+    "xendit",
+    "virtual-queue",
+    "react-native"
+  ],
+  "author": "Ovation Engineering Team",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "prisma": "^6.4.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "midtrans-client": "^1.4.3",
+    "next-auth": "^5.0.0-beta.32",
+    "zod": "^4.6.7"
+  }
+}

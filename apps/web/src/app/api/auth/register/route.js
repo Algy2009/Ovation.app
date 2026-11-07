@@ -3,6 +3,7 @@ import { prisma } from "@/db/client";
 import bcrypt from "bcryptjs";
 import { registerSchema } from "@ovation/validation";
 import { encryptNIK } from "@ovation/shared";
+import { sendWhatsAppOTP } from "@/lib/notifications/whatsapp";
 
 export async function POST(req) {
   try {
@@ -51,6 +52,12 @@ export async function POST(req) {
         createdAt: true,
       },
     });
+
+    // Send WhatsApp Welcome & OTP Verification
+    if (phone) {
+      const demoOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      sendWhatsAppOTP(phone, demoOtp).catch((err) => console.error("WhatsApp OTP error:", err));
+    }
 
     return NextResponse.json({ message: "Registrasi berhasil.", user }, { status: 201 });
   } catch (err) {

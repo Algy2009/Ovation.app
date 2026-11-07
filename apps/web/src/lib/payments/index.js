@@ -12,6 +12,7 @@ import {
   verifyXenditWebhookToken,
   getXenditInvoiceStatus,
 } from "./xendit.js";
+import { sendTicketIssuedWhatsApp } from "../notifications/whatsapp.js";
 
 /**
  * Unified Payment Dispatcher (Midtrans & Xendit)
@@ -233,6 +234,17 @@ export async function handleMidtransWebhook(payload, rawBody) {
           linkUrl: "/account/tickets",
         },
       });
+
+      // Dispatch WhatsApp Notification to Buyer
+      if (order.user?.phone) {
+        sendTicketIssuedWhatsApp(order.user.phone, {
+          buyerName: order.user.name,
+          eventTitle: order.event?.title || "Konser Ovation",
+          orderNumber: order.orderNumber,
+          ticketCount: order.totalQuantity,
+          ticketUrl: `${process.env.APP_URL || "http://localhost:3000"}/account/tickets`,
+        }).catch((err) => console.error("WhatsApp notification dispatch error:", err));
+      }
     }
 
     // Handle EXPIRED / CANCELLED -> Release stock back to inventory!

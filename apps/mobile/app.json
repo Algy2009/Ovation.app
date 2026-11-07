@@ -13,9 +13,11 @@
       "backgroundColor": "#090A0F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "id.co.ovation.app"
     },
     "android": {
+      "package": "id.co.ovation.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#090A0F"

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "../_helpers";
-import path from "node:path";
-import fs from "node:fs/promises";
+import { uploadMediaFile } from "@/lib/storage";
 
 export async function POST(request) {
   const { session, error } = await requireRole("admin", "super_admin");
@@ -34,13 +33,14 @@ export async function POST(request) {
 
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const filename = `poster_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
 
-    await fs.mkdir(uploadDir, { recursive: true });
-    await fs.writeFile(path.join(uploadDir, filename), buffer);
+    const uploadResult = await uploadMediaFile(buffer, filename, file.type);
 
-    const publicUrl = `/uploads/${filename}`;
-    return NextResponse.json({ url: publicUrl, filename });
+    return NextResponse.json({
+      url: uploadResult.url,
+      filename,
+      provider: uploadResult.provider,
+    });
   } catch (err) {
     console.error("Upload error:", err);
     return NextResponse.json({ error: "Gagal mengunggah gambar: " + err.message }, { status: 500 });

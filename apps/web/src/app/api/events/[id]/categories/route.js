@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db/client";
-import { ticketCategories } from "@/db/schema";
-import { makeId, requireRole } from "../../../_helpers";
+import { prisma } from "@/db/client";
+import { requireRole } from "../../../_helpers";
 
 export async function POST(req, { params }) {
   const { error } = await requireRole("admin", "super_admin");
@@ -17,7 +16,27 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Nama, harga, dan kuota tidak valid." }, { status: 400 });
   }
 
-  const id = makeId("cat");
-  await db.insert(ticketCategories).values({ id, eventId, name, price, quota, sold: 0 });
-  return NextResponse.json({ id }, { status: 201 });
+  try {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      return NextResponse.json({ error: "Event tidak ditemukan." }, { status: 404 });
+    }
+
+    const created = await prisma.ticketCategory.create({
+      data: {
+        eventId,
+        name,
+        price,
+        totalQuota: quota,
+        remainingQuota: quota,
+        salesStartTime: event.startDatetime ? new Date(Math.min(Date.now(), event.startDatetime.getTime())) : new Date(),
+        salesEndTime: event.endDatetime || new Date(Date.now() + 86400000 * 30),
+      },
+    });
+
+    return NextResponse.json({ id: created.id }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/events/[id]/categories error:", err);
+    return NextResponse.json({ error: "Gagal menambahkan kategori tiket." }, { status: 500 });
+  }
 }

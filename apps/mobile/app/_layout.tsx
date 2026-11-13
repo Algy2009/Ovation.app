@@ -65,6 +65,13 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="scanner"
+              options={{
+                title: "Gate Scanner Petugas",
+                headerBackTitle: "Kembali",
+              }}
+            />
+            <Stack.Screen
               name="(auth)/login"
               options={{
                 title: "Masuk Akun",

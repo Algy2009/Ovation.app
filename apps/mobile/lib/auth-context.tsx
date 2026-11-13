@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { api, setApiAuth } from "./api";
 
 export interface CustomerUser {
   id: string;
@@ -31,23 +32,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CustomerUser | null>(DEFAULT_DEMO_USER);
 
   async function login(email: string, password: string): Promise<boolean> {
-    // For mobile demo, match demo accounts or allow instant login
+    try {
+      const res = await api.login({ email, password });
+      if (res?.success && res.user) {
+        setApiAuth(res.token, res.user.email, res.user.id);
+        setUser(res.user);
+        return true;
+      }
+    } catch (err) {
+      console.warn("Mobile API login fallback to local credentials:", err);
+    }
+
+    // Fallback for local demo testing without backend server
     if (email === "dinda@example.com" && password === "customer123") {
+      setApiAuth("mob_demo_token", "dinda@example.com", "usr_dinda_001");
       setUser(DEFAULT_DEMO_USER);
       return true;
     }
 
-    setUser({
+    const fallbackUser = {
       id: `usr_${Date.now()}`,
       name: email.split("@")[0],
       email,
       phone: "081234567890",
       nikLast4: "1234",
-    });
+    };
+    setApiAuth(`mob_${fallbackUser.id}`, email, fallbackUser.id);
+    setUser(fallbackUser);
     return true;
   }
 
   function logout() {
+    setApiAuth("", "");
     setUser(null);
   }
 
@@ -73,4 +89,3 @@ export function useAuth() {
   }
   return context;
 }
-

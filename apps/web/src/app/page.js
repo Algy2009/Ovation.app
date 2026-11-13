@@ -48,7 +48,7 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-4 text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">
-              Sistem antrean virtual berkecepatan tinggi, pembayaran instan via Midtrans/Xendit, dan e-ticket Dynamic QR Code anti-calo terverifikasi.
+              Sistem antrean virtual berkecepatan tinggi, pembayaran instan via Midtrans Snap & QRIS, dan e-ticket Dynamic QR Code anti-calo terverifikasi.
             </p>
 
             {/* Modern Search Bar */}
@@ -100,8 +100,8 @@ export default function HomePage() {
                 <ShieldCheck size={20} />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Dual Payment Gateway</p>
-                <p className="text-[11px] text-slate-400">Midtrans & Xendit instan settlement</p>
+                <p className="text-xs font-bold text-white">Midtrans Official Gateway</p>
+                <p className="text-[11px] text-slate-400">QRIS & Virtual Account instan settlement</p>
               </div>
             </div>
           </div>

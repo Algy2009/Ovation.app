@@ -59,6 +59,11 @@ export async function createMidtransSnapTransaction({
       unit: "minutes",
       duration: 15,
     },
+    callbacks: {
+      finish: `${process.env.APP_URL || "http://localhost:3000"}/account/tickets/${orderNumber}`,
+      error: `${process.env.APP_URL || "http://localhost:3000"}/events`,
+      pending: `${process.env.APP_URL || "http://localhost:3000"}/account/tickets/${orderNumber}`,
+    },
   };
 
   try {

@@ -2,7 +2,7 @@
 # PLATFORM PEMESANAN TIKET KONSER ONLINE (OVATION.APP)
 
 > **Standar Arsitektur:** Loket.com, Tiket.com, dan Traveloka.  
-> **Klasifikasi Proyek:** Enterprise High-Concurrency Ticketing Platform (Monorepo Next.js 16 + React Native Expo + MySQL 8.4 + Prisma ORM + Redis + Midtrans & Xendit Dual Gateway).
+> **Klasifikasi Proyek:** Enterprise High-Concurrency Ticketing Platform (Monorepo Next.js 16 + React Native Expo + MySQL 8.4 + Prisma ORM + Redis + Midtrans Payment Gateway).
 
 ---
 
@@ -49,7 +49,7 @@ flowchart TB
     subgraph ServiceLayer["3. Core Application & Service Layer (Node.js REST API)"]
         EventService["Event & Inventory Engine<br>(SELECT FOR UPDATE Concurrency Lock)"]
         QueueEngine["Virtual War Room Queue Engine<br>(Redis Token Bucket / Rate Limiter)"]
-        PaymentDispatcher["Unified Payment Dispatcher<br>(Midtrans CoreApi/Snap + Xendit Invoices)"]
+        PaymentDispatcher["Payment Dispatcher<br>(Midtrans Snap & Core API)"]
         CryptoService["Security Crypto Service<br>(TOTP HMAC-SHA256 & AES-256 NIK)"]
         CheckinService["Gate Validation Service<br>(Single-Use Dynamic QR Verifier)"]
         NotifService["Notification Service<br>(Fonnte WhatsApp API + In-App Alerts)"]
@@ -63,7 +63,6 @@ flowchart TB
 
     subgraph ExternalLayer["5. Third-Party External Services"]
         MidtransPG["Midtrans Payment Gateway<br>(QRIS, Virtual Account, Credit Card)"]
-        XenditPG["Xendit Payment Gateway<br>(E-Wallets, Retail Outlets, Invoices)"]
         WhatsAppAPI["WhatsApp Gateway (Fonnte / Twilio)<br>OTP & E-Ticket Notification Dispatch"]
     end
 
@@ -74,7 +73,6 @@ flowchart TB
     EventService --> MySQL
     QueueEngine --> RedisDB
     PaymentDispatcher --> MidtransPG
-    PaymentDispatcher --> XenditPG
     CryptoService --> MySQL
     CheckinService --> MySQL
     NotifService --> WhatsAppAPI
@@ -122,7 +120,7 @@ flowchart LR
     Organizer(("🏢 Promotor / Organizer"))
     SuperAdmin(("🛡️ Super Admin"))
     GateStaff(("🎟️ Petugas Gate Scanner"))
-    PaymentGW[["💳 Midtrans & Xendit Gateway"]]
+    PaymentGW[["💳 Midtrans Gateway"]]
 
     subgraph OvationSystem["Sistem Platform Ovation.app"]
         UC1["Eksplorasi & Pencarian Konser"]
@@ -199,7 +197,7 @@ flowchart TD
     
     StockAvailable -- Ya --> DecrementStock[Kurangi remainingQuota Secara Atomik]
     DecrementStock --> CreateOrder[Buat Order: Status PENDING, Timer 15 Menit]
-    CreateOrder --> GeneratePayment[Buat Transaksi Midtrans / Xendit]
+    CreateOrder --> GeneratePayment[Buat Transaksi Midtrans Snap]
     GeneratePayment --> PresentPayment[Tampilkan QRIS / Nomor Virtual Account]
     
     PresentPayment --> UserPay{Pembeli Membayar Tepat Waktu?}
@@ -275,7 +273,7 @@ Alur penerimaan callback notifikasi dari payment gateway, verifikasi integritas 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Gateway as Midtrans / Xendit
+    participant Gateway as Midtrans Payment Gateway
     participant WebhookHandler as Webhook Route (/api/webhooks/*)
     participant Crypto as Crypto & Idempotency Validator
     participant DB as MySQL 8.4 (Prisma Transaction)
@@ -653,7 +651,7 @@ erDiagram
     PAYMENTS {
         string id PK "cuid"
         string order_id FK "Relasi ke ORDERS"
-        enum provider "MIDTRANS | XENDIT"
+        enum provider "MIDTRANS"
         enum channel "QRIS | VIRTUAL_ACCOUNT | EWALLET | CREDIT_CARD"
         string reference_id UK "ID transaksi dari payment gateway"
         string merchant_order_id "ID order lokal"
@@ -668,7 +666,7 @@ erDiagram
 
     PAYMENT_WEBHOOK_LOGS {
         string id PK "cuid"
-        enum provider "MIDTRANS | XENDIT"
+        enum provider "MIDTRANS"
         string reference_id "Reference ID provider"
         string order_number "Nomor order lokal"
         string event_type "settlement, expire, capture"
@@ -792,7 +790,7 @@ erDiagram
 | Kolom | Tipe Data | Constraint | Keterangan Fungsional |
 | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(30)` | PK, CUID | Identifier log webhook. |
-| `provider` | `ENUM` | NOT NULL | `MIDTRANS` atau `XENDIT`. |
+| `provider` | `ENUM` | NOT NULL | `MIDTRANS`. |
 | `order_number` | `VARCHAR(50)` | INDEX | Nomor order transaksi terkait (`OVN-XXXXXX`). |
 | `signature_valid` | `BOOLEAN` | NOT NULL | Status keabsahan signature hash SHA-512 dari provider. |
 | `idempotency_hash` | `VARCHAR(64)` | UNIQUE, INDEX | Hash SHA-256 kombinasi: `provider:order_id:status:gross_amount:signature`. Menolak panggilan ganda seketika. |

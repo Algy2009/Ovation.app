@@ -30,7 +30,3 @@ export declare function verifyDynamicTicketToken(presentedToken: string, ticketC
  * Signature formula: SHA512(order_id + status_code + gross_amount + ServerKey)
  */
 export declare function verifyMidtransSignature(orderId: string, statusCode: string, grossAmount: string, serverKey: string, receivedSignature: string): boolean;
-/**
- * Verify Xendit Webhook Verification Token.
- */
-export declare function verifyXenditWebhook(receivedToken: string, configuredToken: string): boolean;

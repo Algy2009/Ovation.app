@@ -162,7 +162,14 @@ export async function POST(req) {
       });
 
       // Issue dynamic QR tickets with unique HMAC secrets
+      const attendees = Array.isArray(body.attendees) ? body.attendees : [];
       for (let i = 0; i < qty; i++) {
+        const att = attendees[i] || {};
+        const attendeeName = att.name?.trim() || session.user.name || "Customer";
+        const attendeeEmail = att.email?.trim() || session.user.email || "";
+        const rawNik = att.nik?.trim() || "3171012304900001";
+        const attendeeNikLast4 = rawNik.length >= 4 ? rawNik.slice(-4) : "0001";
+        const attendeeNikEncrypted = encryptNIK(rawNik);
         const ticketCode = `TKT-${event.slug.slice(0, 3).toUpperCase()}-${category.name.slice(0, 3).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
         const hmacSecret = crypto.randomBytes(32).toString("hex");
 
@@ -170,10 +177,11 @@ export async function POST(req) {
           data: {
             orderItemId: orderItem.id,
             ticketCode,
-            attendeeName: session.user.name,
-            attendeeEmail: session.user.email,
-            attendeeNikEncrypted: encryptNIK("3171012304900001"),
-            attendeeNikLast4: "0001",
+            attendeeName,
+            attendeeEmail,
+            attendeePhone: att.phone?.trim() || null,
+            attendeeNikEncrypted,
+            attendeeNikLast4,
             dynamicHmacSecret: hmacSecret,
             isCheckedIn: false,
           },

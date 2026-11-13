@@ -63,6 +63,7 @@ export async function GET() {
           price: Number(category.price),
           isStanding: category.isStanding,
         },
+        orderId: order.id,
         orderNumber: order.orderNumber,
         purchasedAt: t.createdAt.toISOString(),
       };

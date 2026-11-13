@@ -8,7 +8,12 @@ export async function PATCH(req, { params }) {
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const status = body.status?.toUpperCase();
+  let status = body.status?.toUpperCase();
+
+  // Normalize legacy "APPROVED" status
+  if (status === "APPROVED") {
+    status = session.user.role === "admin" ? "ORGANIZER_APPROVED" : "SUPERADMIN_APPROVED";
+  }
 
   const validStatuses = [
     "ORGANIZER_APPROVED",
@@ -36,14 +41,31 @@ export async function PATCH(req, { params }) {
     updateData.approvedBySuperAdminAt = new Date();
   }
 
-  if (status === "COMPLETED") {
+  if (status === "COMPLETED" || status === "SUPERADMIN_APPROVED") {
     updateData.completedAt = new Date();
   }
 
-  const updated = await prisma.refundRequest.update({
-    where: { id },
-    data: updateData,
-  });
+  try {
+    const updated = await prisma.refundRequest.update({
+      where: { id },
+      data: updateData,
+      include: { order: true, user: true },
+    });
 
-  return NextResponse.json({ ok: true, refund: updated });
+    // Notify customer
+    await prisma.notification.create({
+      data: {
+        userId: updated.userId,
+        title: "Pembaruan Pengajuan Refund",
+        message: `Pengajuan refund pesanan ${updated.order.orderNumber} telah diperbarui menjadi: ${status}.`,
+        type: "REFUND_UPDATE",
+        linkUrl: "/account/tickets",
+      },
+    });
+
+    return NextResponse.json({ ok: true, refund: updated });
+  } catch (err) {
+    console.error("PATCH /api/refunds/[id] error:", err);
+    return NextResponse.json({ error: "Gagal memperbarui status refund." }, { status: 500 });
+  }
 }

@@ -71,6 +71,7 @@ export async function GET(_req, { params }) {
         price: Number(category.price),
         isStanding: category.isStanding,
       },
+      orderId: order.id,
       orderNumber: order.orderNumber,
       purchasedAt: ticket.createdAt.toISOString(),
     });

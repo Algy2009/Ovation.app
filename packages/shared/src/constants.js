@@ -24,7 +24,6 @@ exports.USER_ROLES = {
 };
 exports.PAYMENT_PROVIDERS = {
     MIDTRANS: "MIDTRANS",
-    XENDIT: "XENDIT",
 };
 exports.PAYMENT_CHANNELS = {
     QRIS: "QRIS",

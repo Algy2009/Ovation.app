@@ -26,7 +26,6 @@ export type UserRoleType = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
 export const PAYMENT_PROVIDERS = {
   MIDTRANS: "MIDTRANS",
-  XENDIT: "XENDIT",
 } as const;
 
 export const PAYMENT_CHANNELS = {

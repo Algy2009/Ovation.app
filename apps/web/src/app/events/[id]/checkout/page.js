@@ -17,7 +17,11 @@ import {
   Clock,
   ArrowRight,
   CheckCircle2,
+  ExternalLink,
+  Copy,
+  Sparkles,
 } from "lucide-react";
+import QRCode from "qrcode";
 
 const PAYMENT_METHODS = [
   { id: "QRIS", name: "QRIS (GoPay, OVO, Dana, BCA, Semua Bank)", icon: QrCode, category: "Instant QR" },
@@ -47,6 +51,10 @@ function CheckoutBody() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [paymentModal, setPaymentModal] = useState(null);
+  const [paymentQrDataUrl, setPaymentQrDataUrl] = useState("");
+  const [simulating, setSimulating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // 15-minute holding timer
   const [timeLeft, setTimeLeft] = useState(900);
@@ -119,16 +127,66 @@ function CheckoutBody() {
         }),
       });
 
-      const data = await res.json();
+      const orderData = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Gagal memproses pesanan tiket.");
+        throw new Error(orderData.error || "Gagal memproses pesanan tiket.");
       }
 
-      // Redirect directly to the generated ticket
-      router.push(`/account/tickets/${data.orderNumber || data.id}`);
+      // Initiate payment via Midtrans gateway
+      const payRes = await fetch("/api/payments/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: orderData.id,
+          provider: "MIDTRANS",
+          channel: paymentMethod.includes("VA") ? "VIRTUAL_ACCOUNT" : paymentMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "QRIS",
+          methodDetail: paymentMethod,
+        }),
+      });
+
+      const payJson = await payRes.json().catch(() => ({}));
+      const paymentInfo = payJson.payment || {
+        provider: "MIDTRANS",
+        channel: paymentMethod,
+        vaNumber: "8271081311223344",
+        qrString: "00020101021226670016ID.CO.OVATION.WWW0118936009990000010002021500000192835204581253033605802ID5914OVATION TICKETS6007JAKARTA62070703A0163046B2F",
+        amount: finalAmount,
+      };
+
+      if (paymentInfo.qrString) {
+        try {
+          const dataUrl = await QRCode.toDataURL(paymentInfo.qrString, { width: 220, margin: 1 });
+          setPaymentQrDataUrl(dataUrl);
+        } catch {}
+      }
+
+      setPaymentModal({ order: orderData, payment: paymentInfo });
     } catch (err) {
       setError(err.message);
+    } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSimulatePayment() {
+    if (!paymentModal?.order) return;
+    setSimulating(true);
+    try {
+      await fetch("/api/payments/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: paymentModal.payment?.provider || "MIDTRANS",
+          orderNumber: paymentModal.order.orderNumber,
+          action: "SETTLEMENT",
+        }),
+      });
+
+      // Redirect to ticket page
+      router.push(`/account/tickets/${paymentModal.order.orderNumber || paymentModal.order.id}`);
+    } catch (err) {
+      alert("Gagal memproses simulasi webhook: " + err.message);
+      setSimulating(false);
     }
   }
 
@@ -368,11 +426,101 @@ function CheckoutBody() {
 
               <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-slate-400 text-center">
                 <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
-                <span>Transaksi dijamin aman & terenkripsi oleh Midtrans & Xendit</span>
+                <span>Transaksi dijamin aman & terenkripsi oleh Midtrans Payment Gateway</span>
               </div>
             </div>
           </div>
         </form>
+
+        {/* Midtrans Payment Gateway Modal */}
+        {paymentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            <div className="glass-panel w-full max-w-md rounded-3xl border border-white/10 bg-[#12141F] p-7 shadow-2xl shadow-violet-950/60 text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-amber-500 shadow-lg shadow-violet-600/30">
+                <Sparkles size={24} className="text-white" />
+              </div>
+
+              <div>
+                <span className="rounded-full bg-violet-500/10 border border-violet-500/30 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                  {paymentModal.payment?.provider || "MIDTRANS"} PAYMENT GATEWAY
+                </span>
+                <h3 className="mt-3 text-xl font-black text-white">Menunggu Pembayaran</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Pesanan <span className="font-mono text-paper font-bold">{paymentModal.order?.orderNumber}</span>
+                </p>
+                <p className="mt-2 text-2xl font-black text-amber-400">
+                  {formatIDR(paymentModal.order?.finalAmount || finalAmount)}
+                </p>
+              </div>
+
+              {/* QRIS Display */}
+              {paymentQrDataUrl && (
+                <div className="space-y-3">
+                  <div className="mx-auto w-48 rounded-2xl bg-white p-3 shadow-xl">
+                    <img src={paymentQrDataUrl} alt="QRIS Payment" className="w-full h-auto" />
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Buka GoPay, OVO, Dana, BCA Mobile, atau perbankan apa saja dan pindai QR di atas.
+                  </p>
+                </div>
+              )}
+
+              {/* Virtual Account Display */}
+              {paymentModal.payment?.vaNumber && (
+                <div className="rounded-2xl border border-white/10 bg-black/40 p-4 space-y-1.5 text-left">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Nomor Virtual Account</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-base font-bold text-white tracking-wider">
+                      {paymentModal.payment.vaNumber}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(paymentModal.payment.vaNumber);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-amber-400 hover:text-white"
+                    >
+                      <Copy size={12} />
+                      {copied ? "Tersalin!" : "Salin"}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">Bank: {paymentMethod.replace("_VA", "")}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={handleSimulatePayment}
+                  disabled={simulating}
+                  className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 hover:opacity-95 transition-all flex items-center justify-center gap-2"
+                >
+                  {simulating ? <Clock size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  {simulating ? "Memverifikasi..." : "⚡ Simulasi Pembayaran Sukses (Webhook)"}
+                </button>
+
+                {paymentModal.payment?.paymentUrl && (
+                  <a
+                    href={paymentModal.payment.paymentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    Buka Halaman Midtrans Snap <ExternalLink size={12} />
+                  </a>
+                )}
+
+                <button
+                  onClick={() => router.push(`/account/tickets/${paymentModal.order?.orderNumber || paymentModal.order?.id}`)}
+                  className="w-full py-2 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+                >
+                  Lewati dan Langsung Buka Tiket →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

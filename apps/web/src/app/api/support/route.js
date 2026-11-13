@@ -8,20 +8,56 @@ export async function GET(req) {
 
   try {
     const isStaff = ["admin", "super_admin"].includes(session.user.role);
-    const logs = await prisma.auditLog.findMany({
+    const tickets = await prisma.auditLog.findMany({
       where: isStaff ? { entityName: "support" } : { actorId: session.user.id, entityName: "support" },
+      include: { actor: true },
       orderBy: { createdAt: "desc" },
     });
 
-    const mapped = logs.map((l) => ({
-      id: l.id,
-      buyerName: session.user.name,
-      buyerEmail: session.user.email,
-      subject: l.action,
-      status: "open",
-      createdAt: l.createdAt.toISOString(),
-      messages: [{ id: `msg_${l.id}`, text: l.newValues || "Pertanyaan dukungan pelanggan", from: "customer", at: l.createdAt.toISOString() }],
-    }));
+    const ticketIds = tickets.map((t) => t.id);
+    const allMessages = await prisma.auditLog.findMany({
+      where: {
+        entityName: "support_message",
+        entityId: { in: ticketIds },
+      },
+      include: { actor: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const messagesByTicket = new Map();
+    for (const m of allMessages) {
+      if (!messagesByTicket.has(m.entityId)) {
+        messagesByTicket.set(m.entityId, []);
+      }
+      messagesByTicket.get(m.entityId).push({
+        id: m.id,
+        text: m.newValues || "",
+        from: ["admin", "super_admin"].includes(m.actorRole) ? "admin" : "customer",
+        at: m.createdAt.toISOString(),
+      });
+    }
+
+    const mapped = tickets.map((l) => {
+      const msgs = [
+        {
+          id: `msg_init_${l.id}`,
+          text: l.newValues || "Pertanyaan dukungan pelanggan",
+          from: "customer",
+          at: l.createdAt.toISOString(),
+        },
+        ...(messagesByTicket.get(l.id) || []),
+      ];
+
+      return {
+        id: l.id,
+        buyerName: l.actor?.name || "Customer",
+        buyerEmail: l.actor?.email || "",
+        subject: l.action,
+        status: l.oldValues === "closed" ? "closed" : "open",
+        createdAt: l.createdAt.toISOString(),
+        messages: msgs,
+      };
+    });
 
     return NextResponse.json(mapped);
   } catch (err) {
@@ -51,6 +87,7 @@ export async function POST(req) {
         entityName: "support",
         entityId: `sup_${Date.now()}`,
         newValues: message,
+        oldValues: "open",
       },
     });
 

@@ -126,11 +126,3 @@ export function verifyMidtransSignature(
   return computedHash.toLowerCase() === (receivedSignature || "").toLowerCase();
 }
 
-/**
- * Verify Xendit Webhook Verification Token.
- */
-export function verifyXenditWebhook(receivedToken: string, configuredToken: string): boolean {
-  if (!receivedToken || !configuredToken) return false;
-  return crypto.timingSafeEqual(Buffer.from(receivedToken), Buffer.from(configuredToken));
-}
-

@@ -24,7 +24,6 @@ export declare const checkoutRequestSchema: z.ZodObject<{
     }, z.core.$strip>>;
     paymentProvider: z.ZodDefault<z.ZodEnum<{
         MIDTRANS: "MIDTRANS";
-        XENDIT: "XENDIT";
     }>>;
     paymentChannel: z.ZodEnum<{
         QRIS: "QRIS";

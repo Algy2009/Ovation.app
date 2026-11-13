@@ -7,7 +7,6 @@
 [![Prisma ORM](https://img.shields.io/badge/Prisma-6.4.1-indigo.svg)](https://www.prisma.io/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.4%20ACID-orange.svg)](https://www.mysql.com/)
 [![Midtrans](https://img.shields.io/badge/Payment-Midtrans%20Snap%20%26%20CoreApi-00a4e4.svg)](https://midtrans.com/)
-[![Xendit](https://img.shields.io/badge/Payment-Xendit%20Invoices-117ee3.svg)](https://www.xendit.co/)
 [![Tests](https://img.shields.io/badge/Tests-100%25%20Passed-emerald.svg)](./scripts/test-suite.ts)
 
 ---
@@ -27,7 +26,7 @@ concert-ticket-platform/ (ovation-app/)
 │   │   │   ├── events/[id]/     # Event Details, Waiting War Room & Multi-Channel Checkout
 │   │   │   ├── account/tickets/ # Customer E-Ticket Wallet with Dynamic Rotating SVG QR
 │   │   │   └── api/             # Centralized Next.js REST API Handlers
-│   │   ├── src/lib/payments/    # Dual Gateway Integration (Midtrans & Xendit Engine)
+│   │   ├── src/lib/payments/    # Midtrans Official Gateway Integration (Snap & CoreApi)
 │   │   └── src/db/              # Prisma Client Singleton
 │   └── mobile/                  # React Native + Expo Router (Customer App)
 │       ├── app/
@@ -92,18 +91,15 @@ All 17 tables are enforced with strict foreign key constraints, indexes, and tra
 
 ---
 
-## 4. Payment Gateway Integration (Midtrans & Xendit)
+## 4. Payment Gateway Integration (Midtrans)
 
-### Dual Gateway Architecture
-- **Midtrans Integration (`apps/web/src/lib/payments/midtrans.js`):**
+### Midtrans Gateway Architecture
+- **Midtrans Official Driver (`apps/web/src/lib/payments/midtrans.js`):**
   - **Snap API:** Hosted multi-channel modal checkout.
   - **CoreApi Direct Charges:** QRIS dynamic QR string generation, Virtual Accounts (BCA, Mandiri, BNI, BRI, Permata).
   - **Webhook Signature Verification:** SHA-512 calculation formula:
     $$\text{Signature} = \text{SHA512}(\text{order\_id} + \text{status\_code} + \text{gross\_amount} + \text{ServerKey})$$
-- **Xendit Integration (`apps/web/src/lib/payments/xendit.js`):**
-  - **Invoice API:** Automatic invoice lifecycle, VA, e-Wallets (OVO, DANA, ShopeePay), retail outlets.
-  - **Webhook Token Verification:** Timing-safe token matching via `x-callback-token`.
-- **Unified Payment State Machine (`apps/web/src/lib/payments/index.js`):**
+- **Payment State Machine (`apps/web/src/lib/payments/index.js`):**
   - **Idempotency Protection:** Webhooks generate a SHA-256 idempotency hash; duplicates return `DUPLICATE_IGNORED` immediately.
   - **Automatic Stock Release:** If a webhook reports `expire`, `cancel`, or `deny`, the reserved ticket quota is automatically credited back to `ticket_categories.remaining_quota` in the same database transaction.
   - **Auto-Reconciliation:** Endpoint `GET /api/payments/[id]/status` checks the live provider status and settles lagging transactions.
@@ -231,8 +227,6 @@ DATA_ENCRYPTION_KEY="ovation_secret_key_32_bytes_nik"
 MIDTRANS_SERVER_KEY="SB-Mid-server-YOUR_SANDBOX_SERVER_KEY"
 MIDTRANS_CLIENT_KEY="SB-Mid-client-YOUR_SANDBOX_CLIENT_KEY"
 MIDTRANS_IS_PRODUCTION="false"
-XENDIT_SECRET_KEY="xnd_development_YOUR_XENDIT_SECRET_KEY"
-XENDIT_WEBHOOK_TOKEN="xnd_webhook_verification_token_here"
 ```
 
 ### 2. Database Migration & Seeding

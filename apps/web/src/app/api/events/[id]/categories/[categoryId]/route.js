@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { ticketCategories } from "@/db/schema";
+import { prisma } from "@/db/client";
 import { requireRole } from "../../../../_helpers";
 
 export async function PATCH(req, { params }) {
@@ -10,25 +8,40 @@ export async function PATCH(req, { params }) {
 
   const { categoryId } = await params;
   const body = await req.json().catch(() => ({}));
-  const [existing] = await db.select().from(ticketCategories).where(eq(ticketCategories.id, categoryId)).limit(1);
-  if (!existing) return NextResponse.json({ error: "Kategori tidak ditemukan." }, { status: 404 });
 
-  const patch = {};
-  if ("name" in body) patch.name = body.name;
-  if ("price" in body) patch.price = Number(body.price);
-  if ("quota" in body) {
-    const quota = Number(body.quota);
-    if (quota < existing.sold) {
-      return NextResponse.json(
-        { error: `Kuota tidak boleh kurang dari ${existing.sold} tiket yang sudah terjual.` },
-        { status: 400 }
-      );
+  try {
+    const existing = await prisma.ticketCategory.findUnique({
+      where: { id: categoryId },
+    });
+    if (!existing) return NextResponse.json({ error: "Kategori tidak ditemukan." }, { status: 404 });
+
+    const sold = existing.totalQuota - existing.remainingQuota;
+    const updateData = {};
+
+    if ("name" in body) updateData.name = body.name.trim();
+    if ("price" in body) updateData.price = Number(body.price);
+    if ("quota" in body) {
+      const quota = Number(body.quota);
+      if (quota < sold) {
+        return NextResponse.json(
+          { error: `Kuota tidak boleh kurang dari ${sold} tiket yang sudah terjual.` },
+          { status: 400 }
+        );
+      }
+      updateData.totalQuota = quota;
+      updateData.remainingQuota = quota - sold;
     }
-    patch.quota = quota;
-  }
 
-  await db.update(ticketCategories).set(patch).where(eq(ticketCategories.id, categoryId));
-  return NextResponse.json({ ok: true });
+    const updated = await prisma.ticketCategory.update({
+      where: { id: categoryId },
+      data: updateData,
+    });
+
+    return NextResponse.json({ ok: true, category: updated });
+  } catch (err) {
+    console.error("PATCH /api/events/[id]/categories/[categoryId] error:", err);
+    return NextResponse.json({ error: "Gagal memperbarui kategori tiket." }, { status: 500 });
+  }
 }
 
 export async function DELETE(_req, { params }) {
@@ -36,10 +49,25 @@ export async function DELETE(_req, { params }) {
   if (error) return error;
 
   const { categoryId } = await params;
-  const [existing] = await db.select().from(ticketCategories).where(eq(ticketCategories.id, categoryId)).limit(1);
-  if (existing && existing.sold > 0) {
-    return NextResponse.json({ error: "Kategori dengan tiket terjual tidak bisa dihapus." }, { status: 400 });
+
+  try {
+    const existing = await prisma.ticketCategory.findUnique({
+      where: { id: categoryId },
+    });
+    if (!existing) return NextResponse.json({ error: "Kategori tidak ditemukan." }, { status: 404 });
+
+    const sold = existing.totalQuota - existing.remainingQuota;
+    if (sold > 0) {
+      return NextResponse.json({ error: "Kategori dengan tiket terjual tidak bisa dihapus." }, { status: 400 });
+    }
+
+    await prisma.ticketCategory.delete({
+      where: { id: categoryId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/events/[id]/categories/[categoryId] error:", err);
+    return NextResponse.json({ error: "Gagal menghapus kategori tiket." }, { status: 500 });
   }
-  await db.delete(ticketCategories).where(eq(ticketCategories.id, categoryId));
-  return NextResponse.json({ ok: true });
 }

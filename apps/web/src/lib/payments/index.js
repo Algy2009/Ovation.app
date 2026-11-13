@@ -7,15 +7,10 @@ import {
   verifyWebhookSignature as verifyMidtransWebhook,
   getMidtransStatus,
 } from "./midtrans.js";
-import {
-  createXenditInvoice,
-  verifyXenditWebhookToken,
-  getXenditInvoiceStatus,
-} from "./xendit.js";
 import { sendTicketIssuedWhatsApp } from "../notifications/whatsapp.js";
 
 /**
- * Unified Payment Dispatcher (Midtrans & Xendit)
+ * Midtrans Official Payment Dispatcher
  */
 export async function createPayment({
   provider = "MIDTRANS",
@@ -27,32 +22,7 @@ export async function createPayment({
   items,
   description,
 }) {
-  const normProvider = provider.toUpperCase();
-
-  if (normProvider === "XENDIT") {
-    const xenditRes = await createXenditInvoice({
-      orderNumber,
-      finalAmount,
-      customer,
-      items,
-      description,
-    });
-
-    return {
-      success: true,
-      provider: "XENDIT",
-      channel,
-      referenceId: xenditRes.referenceId,
-      paymentUrl: xenditRes.invoiceUrl,
-      vaNumber: null,
-      qrString: null,
-      amount: finalAmount,
-      expiredAt: new Date(Date.now() + 15 * 60 * 1000),
-      rawResponse: JSON.stringify(xenditRes),
-    };
-  }
-
-  // Default to Midtrans
+  // Exclusively using Midtrans
   const midtransRes = await chargeMidtransDirect({
     orderNumber,
     finalAmount,
@@ -301,129 +271,5 @@ export async function handleMidtransWebhook(payload, rawBody) {
     targetPaymentStatus,
     orderNumber: order_id,
   };
-}
-
-/**
- * Process Xendit Webhook Notification with token verification and idempotency.
- */
-export async function handleXenditWebhook(payload, callbackToken) {
-  const { id: invoiceId, external_id: orderNumber, status: invoiceStatus, amount } = payload;
-
-  const isTokenValid = verifyXenditWebhookToken(callbackToken);
-  const idempotencyHash = crypto
-    .createHash("sha256")
-    .update(`XENDIT:${orderNumber}:${invoiceId}:${invoiceStatus}:${amount}`)
-    .digest("hex");
-
-  const existingLog = await prisma.paymentWebhookLog.findUnique({
-    where: { idempotencyHash },
-  });
-
-  if (existingLog && existingLog.processed) {
-    return { status: "DUPLICATE_IGNORED" };
-  }
-
-  const webhookLog = await prisma.paymentWebhookLog.upsert({
-    where: { idempotencyHash },
-    create: {
-      provider: "XENDIT",
-      referenceId: invoiceId,
-      orderNumber,
-      eventType: invoiceStatus,
-      signatureValid: isTokenValid,
-      idempotencyHash,
-      rawPayload: JSON.stringify(payload),
-      processed: false,
-    },
-    update: {},
-  });
-
-  if (!isTokenValid) {
-    await prisma.paymentWebhookLog.update({
-      where: { id: webhookLog.id },
-      data: { processed: true, processingError: "Invalid Xendit callback token." },
-    });
-    throw new Error("Invalid Xendit callback token.");
-  }
-
-  const isPaid = invoiceStatus === "PAID" || invoiceStatus === "SETTLED";
-  const isExpired = invoiceStatus === "EXPIRED";
-
-  await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { orderNumber },
-      include: {
-        items: {
-          include: { ticketCategory: true, issuedTickets: true },
-        },
-        user: true,
-        event: true,
-      },
-    });
-
-    if (!order) return;
-
-    if (isPaid && order.status !== "PAID") {
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: "PAID", paidAt: new Date() },
-      });
-
-      await tx.payment.updateMany({
-        where: { orderId: order.id },
-        data: { status: "SETTLEMENT", paidAt: new Date() },
-      });
-
-      // Issue dynamic QR tickets
-      for (const item of order.items) {
-        if (item.issuedTickets.length === 0) {
-          for (let i = 0; i < item.quantity; i++) {
-            const ticketCode = `TKT-${order.event.slug.slice(0, 3).toUpperCase()}-${item.ticketCategory.name.slice(0, 3).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-            const hmacSecret = crypto.randomBytes(32).toString("hex");
-
-            await tx.issuedTicket.create({
-              data: {
-                orderItemId: item.id,
-                ticketCode,
-                attendeeName: order.user.name,
-                attendeeEmail: order.user.email,
-                attendeeNikEncrypted: order.user.nikEncrypted || encryptNIK("3171012304900001"),
-                attendeeNikLast4: order.user.nikLast4 || "0001",
-                dynamicHmacSecret: hmacSecret,
-                isCheckedIn: false,
-              },
-            });
-          }
-        }
-      }
-    }
-
-    if (isExpired && order.status !== "EXPIRED" && order.status !== "PAID") {
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: "EXPIRED", cancelledAt: new Date() },
-      });
-
-      await tx.payment.updateMany({
-        where: { orderId: order.id },
-        data: { status: "EXPIRE" },
-      });
-
-      // Release reserved quota
-      for (const item of order.items) {
-        await tx.ticketCategory.update({
-          where: { id: item.ticketCategoryId },
-          data: { remainingQuota: { increment: item.quantity } },
-        });
-      }
-    }
-  });
-
-  await prisma.paymentWebhookLog.update({
-    where: { id: webhookLog.id },
-    data: { processed: true, processedAt: new Date() },
-  });
-
-  return { status: "PROCESSED" };
 }
 

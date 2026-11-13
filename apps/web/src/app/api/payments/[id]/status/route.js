@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/db/client";
 import { requireSession } from "../../../_helpers";
 import { getMidtransStatus } from "@/lib/payments/midtrans";
-import { getXenditInvoiceStatus } from "@/lib/payments/xendit";
 
 export async function GET(_req, { params }) {
   const { session } = await requireSession().catch(() => ({ session: null }));
@@ -40,22 +39,6 @@ export async function GET(_req, { params }) {
         const liveStatus = await getMidtransStatus(order.orderNumber);
         if (liveStatus?.transaction_status === "settlement" || liveStatus?.transaction_status === "capture") {
           // Reconcile as paid
-          await prisma.$transaction(async (tx) => {
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: { status: "SETTLEMENT", paidAt: new Date() },
-            });
-            await tx.order.update({
-              where: { id: order.id },
-              data: { status: "PAID", paidAt: new Date() },
-            });
-          });
-          payment.status = "SETTLEMENT";
-          order.status = "PAID";
-        }
-      } else if (payment.provider === "XENDIT") {
-        const liveInvoice = await getXenditInvoiceStatus(payment.referenceId);
-        if (liveInvoice?.status === "PAID" || liveInvoice?.status === "SETTLED") {
           await prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: payment.id },

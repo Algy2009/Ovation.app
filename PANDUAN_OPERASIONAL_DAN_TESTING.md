@@ -80,10 +80,6 @@ MIDTRANS_SERVER_KEY="SB-Mid-server-YOUR_SANDBOX_SERVER_KEY"
 MIDTRANS_CLIENT_KEY="SB-Mid-client-YOUR_SANDBOX_CLIENT_KEY"
 MIDTRANS_IS_PRODUCTION="false"
 
-# Xendit Sandbox Credentials
-XENDIT_SECRET_KEY="xnd_development_YOUR_XENDIT_SECRET_KEY"
-XENDIT_WEBHOOK_TOKEN="xnd_webhook_verification_token_here"
-
 APP_URL="http://localhost:3000"
 API_URL="http://localhost:3000/api"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -209,7 +205,7 @@ Pengujian otomatis mencakup 6 skenario wajib sesuai spesifikasi sistem tiket ind
 
 ### Simulasi Manual Webhook Payment Gateway (Sandbox)
 
-Untuk menguji perubahan status order secara manual tanpa perlu menunggu callback asli dari Midtrans atau Xendit, gunakan endpoint simulator yang telah disediakan:
+Untuk menguji perubahan status order secara manual tanpa perlu menunggu callback asli dari Midtrans, gunakan endpoint simulator yang telah disediakan:
 
 ```bash
 # Simulasi Pembayaran Sukses (Settlement)

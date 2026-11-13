@@ -21,12 +21,14 @@ import { useAuth } from "@/lib/auth";
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
   { href: "/admin/events", label: "Event & Tiket", icon: Ticket },
+  { href: "/admin/scanner", label: "Gate Scanner QR", icon: QrCode },
   { href: "/admin/analytics", label: "Analitik Penjualan", icon: LineChart },
-  { href: "/admin/reconciliation", label: "Settlement & Bagi Hasil", icon: Wallet },
+  { href: "/admin/reconciliation", label: "Settlement & Payout", icon: Wallet },
 ];
 
 const SUPERADMIN_NAV = [
   { href: "/superadmin", label: "Overview Platform", icon: LayoutGrid, exact: true },
+  { href: "/superadmin/events", label: "Moderasi Event", icon: Ticket },
   { href: "/superadmin/organizers", label: "Verifikasi Promotor", icon: ShieldCheck },
   { href: "/superadmin/refunds", label: "Refund & Sengketa", icon: RotateCcw },
   { href: "/superadmin/fraud", label: "Anti-Fraud & Calo", icon: ShieldAlert },

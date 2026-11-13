@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { supportTickets, supportMessages, notifications } from "@/db/schema";
-import { makeId, requireSession } from "../../../_helpers";
+import { prisma } from "@/db/client";
+import { requireSession } from "../../../_helpers";
 
 export async function POST(req, { params }) {
   const { session, error } = await requireSession();
@@ -11,28 +9,53 @@ export async function POST(req, { params }) {
   const { id: ticketId } = await params;
   const body = await req.json().catch(() => ({}));
   const text = body?.text?.trim();
-  if (!text) return NextResponse.json({ error: "Pesan tidak boleh kosong." }, { status: 400 });
 
-  const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
-  if (!ticket) return NextResponse.json({ error: "Tiket tidak ditemukan." }, { status: 404 });
-
-  const isStaff = ["admin", "super_admin"].includes(session.user.role);
-  const isOwner = ticket.buyerEmail === session.user.email;
-  if (!isStaff && !isOwner) return NextResponse.json({ error: "Tidak diizinkan." }, { status: 403 });
-
-  const from = isStaff ? "admin" : "customer";
-  const now = new Date().toISOString();
-  await db.insert(supportMessages).values({ id: makeId("msg"), ticketId, from, text, at: now });
-
-  if (from === "admin") {
-    await db.insert(notifications).values({
-      id: makeId("ntf"),
-      toEmail: ticket.buyerEmail,
-      message: `Balasan baru untuk tiket "${ticket.subject}".`,
-      read: false,
-      createdAt: now,
-    });
+  if (!text) {
+    return NextResponse.json({ error: "Pesan tidak boleh kosong." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  try {
+    const ticket = await prisma.auditLog.findUnique({
+      where: { id: ticketId },
+      include: { actor: true },
+    });
+
+    if (!ticket) {
+      return NextResponse.json({ error: "Tiket tidak ditemukan." }, { status: 404 });
+    }
+
+    const isStaff = ["admin", "super_admin"].includes(session.user.role);
+    const isOwner = ticket.actorId === session.user.id;
+    if (!isStaff && !isOwner) {
+      return NextResponse.json({ error: "Tidak diizinkan." }, { status: 403 });
+    }
+
+    const messageLog = await prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        action: `REPLY: ${ticket.action}`,
+        entityName: "support_message",
+        entityId: ticketId,
+        newValues: text,
+      },
+    });
+
+    if (isStaff && ticket.actorId) {
+      await prisma.notification.create({
+        data: {
+          userId: ticket.actorId,
+          title: "Balasan Customer Service",
+          message: `Tim Ovation telah membalas tiket bantuan Anda: "${text.slice(0, 80)}..."`,
+          type: "EVENT_UPDATE",
+          linkUrl: "/help",
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true, messageId: messageLog.id });
+  } catch (err) {
+    console.error("POST /api/support/[id]/messages error:", err);
+    return NextResponse.json({ error: "Gagal mengirim balasan." }, { status: 500 });
+  }
 }

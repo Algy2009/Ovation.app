@@ -23,7 +23,7 @@ Namun, di balik tingginya permintaan pasar, platform pemesanan tiket konvensiona
    - Promotor sering menghadapi kesulitan dalam memantau pendapatan kotor, biaya platform, dan alur pencairan dana (*settlement*).
    - Apabila terjadi penundaan atau pembatalan konser, proses pengembalian dana (*refund*) memakan waktu berminggu-minggu karena tidak adanya alur persetujuan terintegrasi dengan penyedia *payment gateway*.
 
-Berdasarkan permasalahan di atas, **Ovation.app** dirancang dan dibangun mengacu pada standar industri terkemuka seperti **Loket.com, Tiket.com, dan Traveloka**. Aplikasi ini mengintegrasikan teknologi *Virtual Waiting Room*, penguncian transaksi atomik berbasis *ACID*, dual payment gateway resmi (Midtrans dan Xendit), enkripsi identitas KTP (NIK), serta tiket digital berotasi (*Dynamic QR TOTP 30-Second*) untuk mewujudkan ekosistem pemesanan tiket konser yang adil, aman, dan transparan.
+Berdasarkan permasalahan di atas, **Ovation.app** dirancang dan dibangun mengacu pada standar industri terkemuka seperti **Loket.com, Tiket.com, dan Traveloka**. Aplikasi ini mengintegrasikan teknologi *Virtual Waiting Room*, penguncian transaksi atomik berbasis *ACID*, payment gateway resmi (Midtrans Snap & Core API), enkripsi identitas KTP (NIK), serta tiket digital berotasi (*Dynamic QR TOTP 30-Second*) untuk mewujudkan ekosistem pemesanan tiket konser yang adil, aman, dan transparan.
 
 ---
 
@@ -120,8 +120,9 @@ Ovation.app menyediakan fungsionalitas menyeluruh yang dibagi berdasarkan peran 
 1. **Anti-Overselling Concurrency Protection:**
    - Menggunakan penguncian baris database InnoDB **`SELECT ... FOR UPDATE`** dan *conditional atomic decrement* (`WHERE remaining_quota >= qty`).
    - Menjamin secara matematis sisa kuota tiket **tidak pernah bernilai minus** meskipun diserbu ribuan pembeli pada detik yang sama.
-2. **Dual Payment Gateway Engine (Midtrans & Xendit):**
-   - Pemrosesan transaksi instan dengan verifikasi signature kriptografis SHA-512 resmi.
+2. **Midtrans Official Payment Gateway Engine:**
+   - Pemrosesan transaksi multi-channel (QRIS, BCA VA, Mandiri VA, BNI VA, BRI VA, Permata VA, GoPay, ShopeePay, Kartu Kredit).
+   - Verifikasi signature kriptografis SHA-512 resmi.
    - **Idempotency Protection:** Webhook duplikat otomatis diabaikan (`DUPLICATE_IGNORED`) untuk mencegah penggandaan tiket.
    - **Auto Stock Release:** Pelepasan kuota tiket kembali ke database secara instan apabila transaksi melewati batas waktu 15 menit (*expired*).
 3. **High-Speed Redis Engine & Graceful Fallback:**

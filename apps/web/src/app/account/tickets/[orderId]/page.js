@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { formatDate, formatIDR } from "@/lib/format";
 import PublicHeader from "@/components/PublicHeader";
 import RequireRole from "@/components/RequireRole";
-import { ArrowLeft, ShieldCheck, RefreshCw, AlertCircle, Clock } from "lucide-react";
+import { ArrowLeft, ShieldCheck, RefreshCw, AlertCircle, Clock, Printer } from "lucide-react";
 import QRCode from "qrcode";
 
 function TicketDetailBody() {
@@ -21,7 +21,11 @@ function TicketDetailBody() {
   const [ticketDetails, setTicketDetails] = useState(null);
   const [ticketLoading, setTicketLoading] = useState(true);
   const [reason, setReason] = useState("");
+  const [bankName, setBankName] = useState("BCA");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountHolder, setBankAccountHolder] = useState("");
   const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundSuccess, setRefundSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const order = getOrder(orderId);
@@ -83,10 +87,19 @@ function TicketDetailBody() {
 
   async function submitRefund(e) {
     e.preventDefault();
-    if (!reason.trim()) return;
+    if (!reason.trim() || !bankAccountNumber.trim() || !bankAccountHolder.trim()) {
+      setError("Mohon lengkapi alasan dan informasi rekening bank pengembalian.");
+      return;
+    }
     try {
-      await requestRefund(order.id, reason.trim());
+      await requestRefund(order.id, {
+        reason: reason.trim(),
+        bankName,
+        bankAccountNumber: bankAccountNumber.trim(),
+        bankAccountHolder: bankAccountHolder.trim(),
+      });
       setShowRefundForm(false);
+      setRefundSuccess(true);
     } catch (err) {
       setError(err.message);
     }
@@ -191,8 +204,18 @@ function TicketDetailBody() {
           </div>
         </div>
 
+        {/* Print / Save Ticket Action */}
+        <div className="mt-4 flex gap-3 print:hidden">
+          <button
+            onClick={() => window.print()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3 text-xs font-semibold text-slate-200 transition-all hover:bg-white/10"
+          >
+            <Printer size={15} /> Cetak / Simpan E-Ticket Resmi
+          </button>
+        </div>
+
         {/* Refund CTA if eligible */}
-        {order?.status === "paid" && !showRefundForm && (
+        {order?.status === "paid" && !showRefundForm && !refundSuccess && (
           <button
             onClick={() => setShowRefundForm(true)}
             className="mt-6 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-xs font-semibold text-slate-300 transition-all hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
@@ -201,17 +224,69 @@ function TicketDetailBody() {
           </button>
         )}
 
+        {refundSuccess && (
+          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+            <p className="text-xs font-bold text-emerald-400">Pengajuan Refund Berhasil Dikirim</p>
+            <p className="mt-1 text-[11px] text-slate-400">Permohonan Anda sedang ditinjau oleh promotor dan Super Admin.</p>
+          </div>
+        )}
+
         {showRefundForm && (
           <form onSubmit={submitRefund} className="mt-6 space-y-4 rounded-2xl border border-white/10 bg-[#12141F] p-5">
-            <h3 className="text-sm font-bold text-white">Formulir Pengajuan Refund</h3>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              placeholder="Jelaskan alasan pengajuan refund sesuai ketentuan promotor..."
-              className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-xs text-white placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
-            />
-            <div className="flex gap-2">
+            <h3 className="text-sm font-bold text-white">Formulir Pengajuan Refund Tiket</h3>
+            
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Alasan Pengajuan</label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={3}
+                placeholder="Jelaskan alasan pengajuan refund sesuai ketentuan promotor..."
+                className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-xs text-white placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nama Bank</label>
+                <select
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white focus:border-violet-500 focus:outline-none"
+                >
+                  <option value="BCA">BCA</option>
+                  <option value="Mandiri">Bank Mandiri</option>
+                  <option value="BNI">BNI</option>
+                  <option value="BRI">BRI</option>
+                  <option value="CIMB Niaga">CIMB Niaga</option>
+                  <option value="Permata">Bank Permata</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nomor Rekening</label>
+                <input
+                  type="text"
+                  value={bankAccountNumber}
+                  onChange={(e) => setBankAccountNumber(e.target.value)}
+                  placeholder="Contoh: 8271928391"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white focus:border-violet-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nama Pemilik Rekening (Sesuai Buku Tabungan)</label>
+              <input
+                type="text"
+                value={bankAccountHolder}
+                onChange={(e) => setBankAccountHolder(e.target.value)}
+                placeholder="Contoh: Dinda Ayu Saraswati"
+                className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white focus:border-violet-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
               <button
                 type="submit"
                 className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-violet-700"

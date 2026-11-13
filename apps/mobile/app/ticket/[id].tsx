@@ -7,11 +7,14 @@ import {
   ActivityIndicator,
   Share,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import QRCode from "react-native-qrcode-svg";
-import { ShieldCheck, Clock, MapPin, Calendar, AlertTriangle, Share2 } from "lucide-react-native";
+import { ShieldCheck, Clock, MapPin, Calendar, AlertTriangle, Share2, RotateCcw, X, CheckCircle } from "lucide-react-native";
 import { api } from "../../lib/api";
 import { THEME } from "../../lib/theme";
 
@@ -19,11 +22,48 @@ export default function MobileTicketDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [countdown, setCountdown] = useState(30);
 
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankAccountNo, setBankAccountNo] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [submittingRefund, setSubmittingRefund] = useState(false);
+  const [refundStatusMessage, setRefundStatusMessage] = useState("");
+
   const { data: ticket, isLoading, refetch } = useQuery({
     queryKey: ["ticket", id],
     queryFn: () => api.getTicketDetail(id!),
     enabled: !!id,
   });
+
+  async function handleSubmitRefund() {
+    if (!refundReason.trim()) {
+      Alert.alert("Perhatian", "Alasan refund wajib diisi.");
+      return;
+    }
+    if (!bankName.trim() || !bankAccountNo.trim() || !bankAccountName.trim()) {
+      Alert.alert("Perhatian", "Data rekening pengembalian dana wajib dilengkapi.");
+      return;
+    }
+
+    setSubmittingRefund(true);
+    try {
+      await api.requestRefund(ticket.orderId, {
+        reason: refundReason,
+        bankName,
+        bankAccountNo,
+        bankAccountName,
+      });
+      setRefundStatusMessage("Permohonan refund berhasil dikirim. Menunggu verifikasi promotor.");
+      setShowRefundModal(false);
+      Alert.alert("Sukses", "Permohonan refund Anda berhasil diajukan.");
+      refetch();
+    } catch (err: any) {
+      Alert.alert("Gagal", err.message || "Gagal mengajukan permohonan refund.");
+    } finally {
+      setSubmittingRefund(false);
+    }
+  }
 
   // 30-second token rotation countdown
   useEffect(() => {
@@ -128,6 +168,118 @@ export default function MobileTicketDetailScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      {/* Refund Success Banner */}
+      {refundStatusMessage ? (
+        <View style={styles.successBanner}>
+          <CheckCircle size={16} color={THEME.colors.success} />
+          <Text style={styles.successBannerText}>{refundStatusMessage}</Text>
+        </View>
+      ) : null}
+
+      {/* Refund Action Card (Only if ticket is unused and orderId is present) */}
+      {!ticket.isCheckedIn && ticket.orderId && !refundStatusMessage ? (
+        <View style={styles.refundCard}>
+          <View style={styles.refundCardHeader}>
+            <RotateCcw size={16} color={THEME.colors.accent} />
+            <Text style={styles.refundTitle}>Pengembalian Dana (Refund)</Text>
+          </View>
+          <Text style={styles.refundDescription}>
+            Berhalangan hadir sebelum konser dimulai? Anda dapat mengajukan permohonan refund dengan menyertakan alasan dan data rekening pencairan.
+          </Text>
+          <TouchableOpacity
+            style={styles.refundButton}
+            onPress={() => setShowRefundModal(true)}
+          >
+            <Text style={styles.refundButtonText}>Ajukan Refund Tiket</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* Refund Request Modal */}
+      <Modal
+        visible={showRefundModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRefundModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <RotateCcw size={18} color={THEME.colors.accent} />
+                <Text style={styles.modalTitle}>Form Pengajuan Refund</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowRefundModal(false)}>
+                <X size={20} color={THEME.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Alasan Pembatalan / Refund *</Text>
+              <TextInput
+                style={[styles.inputField, { height: 70, textAlignVertical: "top" }]}
+                placeholder="Contoh: Kondisi medis mendesak, berhalangan dinas..."
+                placeholderTextColor={THEME.colors.textDim}
+                multiline
+                value={refundReason}
+                onChangeText={setRefundReason}
+              />
+
+              <Text style={styles.inputLabel}>Nama Bank / e-Wallet *</Text>
+              <TextInput
+                style={styles.inputField}
+                placeholder="BCA / Mandiri / BNI / BRI / GoPay"
+                placeholderTextColor={THEME.colors.textDim}
+                value={bankName}
+                onChangeText={setBankName}
+              />
+
+              <Text style={styles.inputLabel}>Nomor Rekening / No. HP e-Wallet *</Text>
+              <TextInput
+                style={styles.inputField}
+                placeholder="1234567890"
+                keyboardType="numeric"
+                placeholderTextColor={THEME.colors.textDim}
+                value={bankAccountNo}
+                onChangeText={setBankAccountNo}
+              />
+
+              <Text style={styles.inputLabel}>Nama Pemilik Rekening *</Text>
+              <TextInput
+                style={styles.inputField}
+                placeholder="Nama sesuai buku tabungan"
+                placeholderTextColor={THEME.colors.textDim}
+                value={bankAccountName}
+                onChangeText={setBankAccountName}
+              />
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setShowRefundModal(false)}
+                  disabled={submittingRefund}
+                >
+                  <Text style={styles.cancelBtnText}>Batal</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, submittingRefund && styles.disabledBtn]}
+                  onPress={handleSubmitRefund}
+                  disabled={submittingRefund}
+                >
+                  {submittingRefund ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Kirim Permohonan</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       </View>
     </ScrollView>
   );
@@ -291,6 +443,139 @@ const styles = StyleSheet.create({
   },
   statusValueUsed: {
     color: THEME.colors.textDim,
+  },
+  refundCard: {
+    marginTop: 16,
+    backgroundColor: THEME.colors.card,
+    borderRadius: THEME.borderRadius.lg,
+    padding: 16,
+    borderColor: "rgba(245, 158, 11, 0.25)",
+    borderWidth: 1,
+  },
+  refundCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  refundTitle: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: THEME.colors.text,
+  },
+  refundDescription: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  refundButton: {
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderColor: THEME.colors.accent,
+    borderWidth: 1,
+    borderRadius: THEME.borderRadius.md,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  refundButtonText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: THEME.colors.accent,
+  },
+  successBanner: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderColor: "rgba(16, 185, 129, 0.3)",
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: THEME.borderRadius.md,
+  },
+  successBannerText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: THEME.colors.success,
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: THEME.colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "85%",
+    borderColor: THEME.colors.border,
+    borderWidth: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: THEME.colors.text,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: THEME.colors.textMuted,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  inputField: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: THEME.colors.border,
+    borderWidth: 1,
+    borderRadius: THEME.borderRadius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: THEME.colors.text,
+    fontSize: 12,
+  },
+  modalActionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingVertical: 12,
+    borderRadius: THEME.borderRadius.md,
+    alignItems: "center",
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: THEME.colors.textMuted,
+  },
+  submitBtn: {
+    flex: 2,
+    backgroundColor: THEME.colors.accent,
+    paddingVertical: 12,
+    borderRadius: THEME.borderRadius.md,
+    alignItems: "center",
+  },
+  submitBtnText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  disabledBtn: {
+    opacity: 0.6,
   },
 });
 

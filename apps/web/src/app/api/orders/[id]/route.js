@@ -61,7 +61,7 @@ export async function GET(_req, { params }) {
 }
 
 export async function PATCH(req, { params }) {
-  const { error } = await requireRole("super_admin");
+  const { session, error } = await requireRole("super_admin");
   if (error) return error;
 
   const { id } = await params;
@@ -69,16 +69,38 @@ export async function PATCH(req, { params }) {
   const updateData = {};
 
   if (body.status) {
-    const s = body.status.toUpperCase();
+    let s = body.status.toUpperCase();
+    if (s === "BLOCKED") s = "CANCELLED";
     if (["PENDING", "PAYMENT_PROCESSING", "PAID", "EXPIRED", "CANCELLED", "REFUNDED"].includes(s)) {
       updateData.status = s;
     }
   }
 
-  await prisma.order.update({
-    where: { id },
-    data: updateData,
-  });
+  try {
+    // Record audit trail of anti-fraud action
+    if (body.status === "blocked" || body.status === "CANCELLED" || body.flagged === false) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: session?.user?.id || null,
+          actorRole: "SUPER_ADMIN",
+          action: body.status ? "ORDER_BLOCKED" : "ORDER_FLAG_CLEARED",
+          entityName: "order",
+          entityId: id,
+          newValues: JSON.stringify(body),
+        },
+      });
+    }
 
-  return NextResponse.json({ ok: true });
+    if (Object.keys(updateData).length > 0) {
+      await prisma.order.update({
+        where: { id },
+        data: updateData,
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /api/orders/[id] error:", err);
+    return NextResponse.json({ error: "Gagal memperbarui status order." }, { status: 500 });
+  }
 }

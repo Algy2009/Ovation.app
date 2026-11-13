@@ -2,7 +2,7 @@
   "name": "ovation-app-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Enterprise Concert Ticket Booking Platform (Midtrans, Xendit, Virtual Queue, Anti-Overselling)",
+  "description": "Enterprise Concert Ticket Booking Platform (Midtrans, Virtual Queue, Anti-Overselling)",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -21,7 +21,6 @@
     "nextjs",
     "prisma",
     "midtrans",
-    "xendit",
     "virtual-queue",
     "react-native"
   ],

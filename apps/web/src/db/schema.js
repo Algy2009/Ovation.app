@@ -1,3 +1,9 @@
+/**
+ * @deprecated
+ * ARSIP / LEGACY PROTOTYPE FILE:
+ * Database utama telah dimigrasikan ke MySQL 8.4 menggunakan Prisma ORM (@ovation/database).
+ * Jangan gunakan skema SQLite ini. Gunakan PrismaClient dari `@/db/client` atau `@ovation/database`.
+ */
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {

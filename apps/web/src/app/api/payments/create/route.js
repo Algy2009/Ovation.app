@@ -54,11 +54,11 @@ export async function POST(req) {
       description: `Tiket ${order.event.title} (${order.orderNumber})`,
     });
 
-    // Create or update payment record
+    // Create payment record via Midtrans
     const paymentRecord = await prisma.payment.create({
       data: {
         orderId: order.id,
-        provider: provider.toUpperCase() === "XENDIT" ? "XENDIT" : "MIDTRANS",
+        provider: "MIDTRANS",
         channel,
         paymentMethodDetail: methodDetail || channel,
         referenceId: paymentResult.referenceId || `ref_${order.id}`,

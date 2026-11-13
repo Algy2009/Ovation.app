@@ -17,7 +17,7 @@ export const checkoutRequestSchema = z.object({
   queueToken: z.string().optional(), // Required if event has active virtual queue
   items: z.array(checkoutItemSchema).min(1, "Pilih minimal satu tiket"),
   attendees: z.array(attendeeInfoSchema).min(1, "Data pengunjung wajib diisi"),
-  paymentProvider: z.enum(["MIDTRANS", "XENDIT"]).default("MIDTRANS"),
+  paymentProvider: z.enum(["MIDTRANS"]).default("MIDTRANS"),
   paymentChannel: z.enum(["QRIS", "VIRTUAL_ACCOUNT", "EWALLET", "CREDIT_CARD", "RETAIL_OUTLET"]),
   paymentMethodDetail: z.string().optional(), // "BCA", "MANDIRI", "GOPAY", etc.
   idempotencyKey: z.string().min(8, "Idempotency key wajib disertakan"),

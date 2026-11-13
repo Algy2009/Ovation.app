@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { ShieldCheck, User, Phone, Mail, CreditCard, LogOut, FileText, ChevronRight } from "lucide-react-native";
+import { ShieldCheck, User, Phone, Mail, CreditCard, LogOut, FileText, ChevronRight, ScanLine } from "lucide-react-native";
 import { useAuth } from "../../lib/auth-context";
 import { THEME } from "../../lib/theme";
 
@@ -67,6 +67,16 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {/* Promoter / Staff Scanner Shortcut */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push("/scanner")}
+        style={styles.scannerButton}
+      >
+        <ScanLine size={16} color={THEME.colors.accent} />
+        <Text style={styles.scannerText}>Buka Gate Scanner Petugas</Text>
+      </TouchableOpacity>
 
       {/* Logout Action */}
       <TouchableOpacity
@@ -201,6 +211,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "bold",
     color: THEME.colors.success,
+  },
+  scannerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: THEME.borderRadius.md,
+    borderColor: "rgba(245, 158, 11, 0.35)",
+    borderWidth: 1,
+    paddingVertical: 14,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  scannerText: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: THEME.colors.accent,
   },
   logoutButton: {
     flexDirection: "row",

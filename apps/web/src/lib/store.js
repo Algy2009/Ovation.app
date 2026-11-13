@@ -162,20 +162,27 @@ export function DataProvider({ children }) {
         await Promise.all([refreshEvents(), refreshOrders(), refreshNotifications()]);
         return id;
       },
-      async requestRefund(orderId, reason) {
-        await api(`/api/orders/${orderId}/refund`, { method: "POST", body: JSON.stringify({ reason }) });
-        await refreshOrders();
+      async requestRefund(orderId, refundInput) {
+        const payload =
+          typeof refundInput === "string"
+            ? { reason: refundInput, bankName: "BCA", bankAccountNumber: "1234567890", bankAccountHolder: "Customer" }
+            : refundInput;
+        await api("/api/refunds", {
+          method: "POST",
+          body: JSON.stringify({ orderId, ...payload }),
+        });
+        await Promise.all([refreshOrders(), refreshRefunds()]);
       },
       async approveRefund(refundId) {
-        await api(`/api/refunds/${refundId}`, { method: "PATCH", body: JSON.stringify({ status: "approved" }) });
+        await api(`/api/refunds/${refundId}`, { method: "PATCH", body: JSON.stringify({ status: "SUPERADMIN_APPROVED" }) });
         await Promise.all([refreshRefunds(), refreshOrders()]);
       },
       async rejectRefund(refundId) {
-        await api(`/api/refunds/${refundId}`, { method: "PATCH", body: JSON.stringify({ status: "rejected" }) });
+        await api(`/api/refunds/${refundId}`, { method: "PATCH", body: JSON.stringify({ status: "REJECTED" }) });
         await Promise.all([refreshRefunds(), refreshOrders()]);
       },
       async blockOrder(orderId) {
-        await api(`/api/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "blocked" }) });
+        await api(`/api/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
         await refreshOrders();
       },
       async clearFlag(orderId) {

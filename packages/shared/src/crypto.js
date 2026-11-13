@@ -9,7 +9,6 @@ exports.decryptNIK = decryptNIK;
 exports.generateDynamicTicketToken = generateDynamicTicketToken;
 exports.verifyDynamicTicketToken = verifyDynamicTicketToken;
 exports.verifyMidtransSignature = verifyMidtransSignature;
-exports.verifyXenditWebhook = verifyXenditWebhook;
 const crypto_1 = __importDefault(require("crypto"));
 // ==============================================================================
 // CRYPTO & SECURITY UTILITIES
@@ -96,13 +95,5 @@ function verifyMidtransSignature(orderId, statusCode, grossAmount, serverKey, re
     const payload = `${orderId}${statusCode}${grossAmount}${serverKey}`;
     const computedHash = crypto_1.default.createHash("sha512").update(payload).digest("hex");
     return computedHash.toLowerCase() === (receivedSignature || "").toLowerCase();
-}
-/**
- * Verify Xendit Webhook Verification Token.
- */
-function verifyXenditWebhook(receivedToken, configuredToken) {
-    if (!receivedToken || !configuredToken)
-        return false;
-    return crypto_1.default.timingSafeEqual(Buffer.from(receivedToken), Buffer.from(configuredToken));
 }
 //# sourceMappingURL=crypto.js.map

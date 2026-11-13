@@ -19,7 +19,6 @@ export declare const USER_ROLES: {
 export type UserRoleType = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 export declare const PAYMENT_PROVIDERS: {
     readonly MIDTRANS: "MIDTRANS";
-    readonly XENDIT: "XENDIT";
 };
 export declare const PAYMENT_CHANNELS: {
     readonly QRIS: "QRIS";

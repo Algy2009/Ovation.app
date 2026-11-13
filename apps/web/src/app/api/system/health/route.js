@@ -28,9 +28,6 @@ export async function GET() {
         isConfigured: !!process.env.MIDTRANS_SERVER_KEY,
         isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
       },
-      xendit: {
-        isConfigured: !!process.env.XENDIT_SECRET_KEY,
-      },
     },
   });
 }

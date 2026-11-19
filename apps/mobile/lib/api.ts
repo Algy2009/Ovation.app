@@ -68,6 +68,18 @@ export const api = {
     }),
   getOrder: (id: string) => request<any>(`/api/orders/${id}`),
 
+  // Midtrans Payment Gateway
+  createPayment: (payload: { orderId: string; provider?: string; channel?: string; methodDetail?: string }) =>
+    request<{ success: boolean; payment: any }>("/api/payments/create", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  simulatePayment: (payload: { provider?: string; orderNumber: string; action?: string }) =>
+    request<{ success: boolean; message: string }>("/api/payments/simulate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   // Tickets
   getMyTickets: () => request<any[]>("/api/tickets"),
   getTicketDetail: (id: string) => request<any>(`/api/tickets/${id}`),

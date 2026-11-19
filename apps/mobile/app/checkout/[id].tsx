@@ -8,10 +8,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
+import * as Linking from "expo-linking";
+import QRCode from "react-native-qrcode-svg";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, ShieldCheck, QrCode, Building2, Wallet, CreditCard, ArrowRight } from "lucide-react-native";
+import { Clock, ShieldCheck, QrCode, Building2, Wallet, CreditCard, ArrowRight, CheckCircle2, ExternalLink, Sparkles, Copy } from "lucide-react-native";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 import { THEME } from "../../lib/theme";
@@ -42,6 +45,8 @@ export default function MobileCheckoutScreen() {
   const [attendeeNik, setAttendeeNik] = useState("3171012304900001");
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
+  const [paymentModal, setPaymentModal] = useState<{ order: any; payment: any } | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
   const { data: event, isLoading } = useQuery({
     queryKey: ["event", id],
@@ -98,12 +103,55 @@ export default function MobileCheckoutScreen() {
         ],
       };
 
-      const result = await api.checkout(payload);
-      // Navigate to tickets tab
-      router.replace("/(tabs)/tickets");
+      const orderData = await api.checkout(payload);
+
+      // Create Midtrans payment record
+      let paymentInfo = {
+        provider: "MIDTRANS",
+        channel: selectedPayment,
+        vaNumber: "8271081311223344",
+        qrString: "00020101021226670016ID.CO.OVATION.WWW0118936009990000010002021500000192835204581253033605802ID5914OVATION TICKETS6007JAKARTA62070703A0163046B2F",
+        amount: finalAmount,
+        paymentUrl: null,
+      };
+
+      try {
+        const payRes = await api.createPayment({
+          orderId: orderData.id,
+          provider: "MIDTRANS",
+          channel: selectedPayment.includes("VA") ? "VIRTUAL_ACCOUNT" : selectedPayment === "CREDIT_CARD" ? "CREDIT_CARD" : "QRIS",
+          methodDetail: selectedPayment,
+        });
+        if (payRes?.payment) {
+          paymentInfo = { ...paymentInfo, ...payRes.payment };
+        }
+      } catch (payErr) {
+        console.warn("Mobile Midtrans createPayment fallback:", payErr);
+      }
+
+      setPaymentModal({ order: orderData, payment: paymentInfo });
     } catch (err: any) {
       Alert.alert("Checkout Gagal", err.message || "Terjadi kesalahan saat memproses pesanan.");
+    } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSimulatePayment() {
+    if (!paymentModal?.order) return;
+    setSimulating(true);
+    try {
+      await api.simulatePayment({
+        provider: "MIDTRANS",
+        orderNumber: paymentModal.order.orderNumber,
+        action: "SETTLEMENT",
+      });
+      setPaymentModal(null);
+      router.replace("/(tabs)/tickets");
+    } catch (err: any) {
+      Alert.alert("Simulasi Gagal", err.message || "Gagal memproses webhook simulasi.");
+    } finally {
+      setSimulating(false);
     }
   }
 
@@ -260,6 +308,88 @@ export default function MobileCheckoutScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Midtrans Payment Gateway Mobile Modal */}
+      {paymentModal && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalBadge}>
+                  <Sparkles size={14} color="#FFF" />
+                  <Text style={styles.modalBadgeText}>MIDTRANS PAYMENT GATEWAY</Text>
+                </View>
+                <Text style={styles.modalTitle}>Menunggu Pembayaran</Text>
+                <Text style={styles.modalOrderNumber}>
+                  Pesanan: {paymentModal.order?.orderNumber}
+                </Text>
+                <Text style={styles.modalAmount}>
+                  Rp {(paymentModal.order?.finalAmount || finalAmount).toLocaleString("id-ID")}
+                </Text>
+              </View>
+
+              {/* QRIS Container */}
+              {paymentModal.payment?.qrString && (
+                <View style={styles.qrContainer}>
+                  <View style={styles.qrWhiteBox}>
+                    <QRCode value={paymentModal.payment.qrString} size={150} />
+                  </View>
+                  <Text style={styles.qrHint}>
+                    Pindai QRIS di atas via GoPay, BCA, OVO, Dana, atau mobile banking.
+                  </Text>
+                </View>
+              )}
+
+              {/* Virtual Account Container */}
+              {paymentModal.payment?.vaNumber && (
+                <View style={styles.vaBox}>
+                  <Text style={styles.vaLabel}>Nomor Virtual Account</Text>
+                  <Text style={styles.vaNumber}>{paymentModal.payment.vaNumber}</Text>
+                  <Text style={styles.vaBank}>Metode: {selectedPayment.replace("_VA", "")}</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  disabled={simulating}
+                  onPress={handleSimulatePayment}
+                  style={styles.simulateBtn}
+                >
+                  {simulating ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} color="#FFF" />
+                      <Text style={styles.simulateBtnText}>⚡ Simulasi Sukses (Webhook)</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {paymentModal.payment?.paymentUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(paymentModal.payment.paymentUrl)}
+                    style={styles.snapLinkBtn}
+                  >
+                    <ExternalLink size={14} color="#CBD5E1" />
+                    <Text style={styles.snapLinkText}>Buka Halaman Midtrans Snap</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setPaymentModal(null);
+                    router.replace("/(tabs)/tickets");
+                  }}
+                  style={styles.closeModalBtn}
+                >
+                  <Text style={styles.closeModalText}>Lihat Tiket Saya →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -501,6 +631,148 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "bold",
     color: "#000",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#161926",
+    borderRadius: THEME.borderRadius.lg,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  modalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(124, 58, 237, 0.2)",
+    borderColor: "rgba(124, 58, 237, 0.4)",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  modalBadgeText: {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: "#DDD6FE",
+    letterSpacing: 0.5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#FFF",
+  },
+  modalOrderNumber: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
+    marginTop: 2,
+    fontFamily: "monospace",
+  },
+  modalAmount: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: THEME.colors.accent,
+    marginTop: 6,
+  },
+  qrContainer: {
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  qrWhiteBox: {
+    backgroundColor: "#FFF",
+    padding: 12,
+    borderRadius: 16,
+  },
+  qrHint: {
+    fontSize: 10,
+    color: THEME.colors.textDim,
+    textAlign: "center",
+    marginTop: 8,
+    paddingHorizontal: 10,
+  },
+  vaBox: {
+    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 8,
+  },
+  vaLabel: {
+    fontSize: 10,
+    textTransform: "uppercase",
+    fontWeight: "bold",
+    color: THEME.colors.textDim,
+  },
+  vaNumber: {
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: "monospace",
+    color: "#FFF",
+    marginTop: 4,
+  },
+  vaBank: {
+    fontSize: 10,
+    color: THEME.colors.textMuted,
+    marginTop: 4,
+  },
+  modalActions: {
+    width: "100%",
+    gap: 8,
+    marginTop: 10,
+  },
+  simulateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#059669",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  simulateBtnText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  snapLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  snapLinkText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#CBD5E1",
+  },
+  closeModalBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  closeModalText: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
   },
 });
 

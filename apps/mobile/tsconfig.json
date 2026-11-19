@@ -10,10 +10,20 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@ovation/shared": ["../../packages/shared/src/index.ts"],
-      "@ovation/validation": ["../../packages/validation/src/index.ts"]
+      "@/*": [
+        "./*"
+      ],
+      "@ovation/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@ovation/validation": [
+        "../../packages/validation/src/index.ts"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "extends": "expo/tsconfig.base"
 }

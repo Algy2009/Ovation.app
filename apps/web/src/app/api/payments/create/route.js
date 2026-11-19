@@ -83,6 +83,7 @@ export async function POST(req) {
         amount: Number(paymentRecord.amount),
         status: paymentRecord.status,
         paymentUrl: paymentRecord.paymentUrl,
+        snapToken: paymentResult.snapToken || null,
         vaNumber: paymentRecord.vaNumber,
         qrString: paymentRecord.qrString,
         expiredAt: paymentRecord.expiredAt.toISOString(),

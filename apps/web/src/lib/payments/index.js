@@ -8,6 +8,7 @@ import {
   getMidtransStatus,
 } from "./midtrans.js";
 import { sendTicketIssuedWhatsApp } from "../notifications/whatsapp.js";
+import { sendETicketEmail } from "../email.js";
 
 /**
  * Midtrans Official Payment Dispatcher
@@ -22,7 +23,20 @@ export async function createPayment({
   items,
   description,
 }) {
-  // Exclusively using Midtrans
+  // 1. Create Midtrans Snap Transaction for Interactive Frontend Popups
+  let snapRes = null;
+  try {
+    snapRes = await createMidtransSnapTransaction({
+      orderNumber,
+      finalAmount,
+      customer: customer || { name: "Customer", email: "customer@ovation.id" },
+      items: items && items.length > 0 ? items : [{ name: description || `Tiket ${orderNumber}`, unitPrice: finalAmount, quantity: 1 }],
+    });
+  } catch (err) {
+    console.warn("Midtrans Snap transaction fallback:", err.message);
+  }
+
+  // 2. Direct Core API charge (for instant QRIS / Virtual Account number)
   const midtransRes = await chargeMidtransDirect({
     orderNumber,
     finalAmount,
@@ -35,13 +49,14 @@ export async function createPayment({
     success: true,
     provider: "MIDTRANS",
     channel,
-    referenceId: midtransRes.referenceId,
-    paymentUrl: midtransRes.redirectUrl || null,
+    referenceId: midtransRes.referenceId || snapRes?.token || `mid_${orderNumber}`,
+    snapToken: snapRes?.token || null,
+    paymentUrl: snapRes?.redirectUrl || midtransRes.redirectUrl || null,
     vaNumber: midtransRes.vaNumber || null,
     qrString: midtransRes.qrString || null,
     amount: finalAmount,
     expiredAt: new Date(Date.now() + 15 * 60 * 1000),
-    rawResponse: JSON.stringify(midtransRes),
+    rawResponse: JSON.stringify({ midtransRes, snapRes }),
   };
 }
 
@@ -214,6 +229,33 @@ export async function handleMidtransWebhook(payload, rawBody) {
           ticketCount: order.totalQuantity,
           ticketUrl: `${process.env.APP_URL || "http://localhost:3000"}/account/tickets`,
         }).catch((err) => console.error("WhatsApp notification dispatch error:", err));
+      }
+
+      // Dispatch Official E-Ticket Email to Buyer
+      if (order.user?.email) {
+        sendETicketEmail({
+          to: order.user.email,
+          buyerName: order.user.name,
+          orderNumber: order.orderNumber,
+          eventName: order.event?.title || "Konser Ovation",
+          eventDate: order.event?.startDatetime
+            ? new Date(order.event.startDatetime).toLocaleDateString("id-ID", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })
+            : "Jadwal Konser",
+          venue: `${order.event?.venueName || "Venue Utama"}, ${order.event?.venueCity || ""}`,
+          totalAmount: Number(order.finalAmount),
+          tickets: order.items.flatMap((item) =>
+            item.issuedTickets.map((t) => ({
+              ticketCode: t.ticketCode,
+              categoryName: item.ticketCategory?.name,
+              attendeeName: t.attendeeName,
+            }))
+          ),
+        }).catch((err) => console.error("Email notification dispatch error:", err));
       }
     }
 

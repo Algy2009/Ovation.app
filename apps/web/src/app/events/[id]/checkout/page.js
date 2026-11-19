@@ -89,6 +89,24 @@ function CheckoutBody() {
     return () => clearInterval(timer);
   }, []);
 
+  // Inject official Midtrans Snap script
+  useEffect(() => {
+    const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === "true";
+    const snapScriptUrl = isProd
+      ? "https://app.midtrans.com/snap/snap.js"
+      : "https://app.sandbox.midtrans.com/snap/snap.js";
+    const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "SB-Mid-client-YOUR_SANDBOX_CLIENT_KEY";
+
+    let script = document.querySelector(`script[src="${snapScriptUrl}"]`);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = snapScriptUrl;
+      script.setAttribute("data-client-key", clientKey);
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   const formatTimer = (sec) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -160,7 +178,26 @@ function CheckoutBody() {
         } catch {}
       }
 
-      setPaymentModal({ order: orderData, payment: paymentInfo });
+      // If official Midtrans Snap SDK is loaded and token is valid, trigger Snap popup directly
+      if (paymentInfo.snapToken && typeof window !== "undefined" && window.snap && !paymentInfo.snapToken.startsWith("snap_sb_")) {
+        window.snap.pay(paymentInfo.snapToken, {
+          onSuccess: () => {
+            router.push(`/account/tickets/${orderData.orderNumber || orderData.id}`);
+          },
+          onPending: () => {
+            setPaymentModal({ order: orderData, payment: paymentInfo });
+          },
+          onError: () => {
+            setError("Pembayaran gagal diproses oleh gateway.");
+            setPaymentModal({ order: orderData, payment: paymentInfo });
+          },
+          onClose: () => {
+            setPaymentModal({ order: orderData, payment: paymentInfo });
+          },
+        });
+      } else {
+        setPaymentModal({ order: orderData, payment: paymentInfo });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -499,6 +536,22 @@ function CheckoutBody() {
                   {simulating ? <Clock size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   {simulating ? "Memverifikasi..." : "⚡ Simulasi Pembayaran Sukses (Webhook)"}
                 </button>
+
+                {paymentModal.payment?.snapToken && typeof window !== "undefined" && window.snap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.snap.pay(paymentModal.payment.snapToken, {
+                        onSuccess: () => router.push(`/account/tickets/${paymentModal.order?.orderNumber || paymentModal.order?.id}`),
+                        onPending: () => {},
+                        onError: () => alert("Pembayaran gagal."),
+                      });
+                    }}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-xs font-bold text-white shadow-lg shadow-violet-600/30 hover:opacity-95 transition-all"
+                  >
+                    <CreditCard size={14} /> Buka Pop-up Midtrans Snap
+                  </button>
+                )}
 
                 {paymentModal.payment?.paymentUrl && (
                   <a
